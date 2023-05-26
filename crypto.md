@@ -400,14 +400,45 @@ const (
 )
 
 func main() {
-    // допишите код
-    // 1) получите ключ из password, используя sha256.Sum256
-    // 2) создайте aesblock и aesgcm
-    // 3) получите вектор инициализации aesgcm.NonceSize() байт с конца ключа
-    // 4) декодируйте сообщение msg в двоичный формат
-    // 5) расшифруйте и выведите данные
+	// допишите код
+	// 1) получите ключ из password, используя sha256.Sum256
+	key := sha256.Sum256([]byte(password))
 
-    // ...
+	// 2) создайте aesblock и aesgcm
+	aesblock, err := aes.NewCipher(key[:])
+	if err != nil {
+		panic(err)
+	}
+
+	// 3) получите вектор инициализации aesgcm.NonceSize() байт с конца ключа
+	aesgcm, err := cipher.NewGCM(aesblock)
+	if err != nil {
+		panic(err)
+	}
+
+	// 4) декодируйте сообщение msg в двоичный формат
+	// создаём вектор инициализации
+	nonce := key[len(key)-aesgcm.NonceSize():]
+
+	encrypted, err := hex.DecodeString(msg)
+	if err != nil {
+		panic(err)
+	}
+
+	// 5) расшифруйте и выведите данные
+
+	// расшифровываем
+	decrypted, err := aesgcm.Open(nil, nonce, encrypted, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(decrypted))
 }
 ```
-ответ:
+**Дополнительные материалы**
+
+Cryptanalytic Attacks on Pseudorandom Number Generators.
+Алгоритм AES.
+Алгоритм GCM.
+Алгоритм HMAC.
