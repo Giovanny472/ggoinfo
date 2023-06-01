@@ -315,3 +315,109 @@ Tags []string
 + Scan() — для чтения из БД и приведения данных к сложным типам и структурам Go.
 
 Наследуем функцию Value():
+```go
+// Value — функция для тегов, которая наследуется из пакета database/sql.
+func (tags Tags) Value() (driver.Value, error) {
+    // преобразуем []string в string
+    if len(tags) == 0 {
+        return "", nil
+    }
+    return strings.Join(tags, "|"), nil
+} 
+```
+
+Важно преобразовать значения в один из поддерживаемых типов: int64, float64, bool, []byte, string, time.Time, nil.
+
+Теперь можно записывать значения в базу. Но нужно и считывать данные — для этого наследуем функцию **Scan()**.
+
+```go
+func (tags *Tags) Scan(value interface{}) error {
+    if value == nil {
+        *tags = Tags{}
+        return nil
+    }
+
+    sv, err := driver.String.ConvertValue(value)
+    if err != nil {
+        return fmt.Errorf("cannot scan value. %w", err)
+    }
+
+    v, ok := sv.(string)
+    if !ok {
+        return errors.New("cannot scan value. cannot convert value to string")
+    }
+
+    *tags = strings.Split(v, "|")
+
+    return nil
+} 
+```
+
+Если value — это поле nil, возвращаем пустой массив.
+
+Функцией **driver.String.ConvertValue(value)** пытаемся конвертировать значение в строку. Если не получится, функция вернёт ошибку. Открыв функцию driver.**String.ConvertValue(value)**, увидим, что она никогда не возвращает ошибку.
+После этого указываем, чему должен равняться атрибут tags, функцией:  __*tags__ = **string.Split(v, "|")**.
+
+
+```go
+func (stringType) ConvertValue(v interface{}) (Value, error) {
+    switch v.(type) {
+    case string, []byte:
+        return v, nil
+    }
+    return fmt.Sprintf("%v", v), nil
+}
+```
+
+Можно ли пропустить проверку ошибок для строк? Нет. В будущем пакет может измениться.
+Теперь вы можете делать запросы к БД в Go-программе и знаете, что:
+
+
++ декларация запроса пишется на стандартном языке SQL и передаётся методам **Query()** в виде аргумента **string**;
++ полученные в результате запроса строки перебирает метод Rows.Next();
++ разбор строки в целевую структуру Go делает метод Row.Scan();
++ конверсия между SQL и Go для базовых типов уже реализована в пакете database/sql;
++ пакет предоставляет интерфейс для конверсии пользовательских типов.
+Предлагаем закрепить знания на практике.
+
+**Задание 6**
+В базе есть атрибут trending_date. Его значения могут быть такими:
+18.31.05,
+17.29.12,
+05.01.12.
+
+```go
+type Trend struct{
+    T time.Time
+    Count int
+}
+func (db *sql.DB) TrendingCount() []Trend, err {
+    // проверяем на всякий случай
+    if db == nil {
+        return nil, errors.New("You haven`t open the database connection")
+    }
+
+    rows, err := db.Query("SELECT trending_date, COUNT(trending_date) FROM videos GROUP BY trending_date")
+
+    if err != nil {
+        return nil, err
+    }
+
+    trends := make([]Trend, 0)
+    date := new(string)
+
+    for rows.Next() {
+        trend := Trend{}
+        err = rows.Scan(date, &trend.Count)
+        if err != nil {
+            return nil, err
+        }
+        
+        if trend.T , err := time.Parse("06.02.01", *date); err != nil {
+            return nil, err
+        }
+        trends = append(trends, trend)
+    }
+    return trends, nil
+}
+```
